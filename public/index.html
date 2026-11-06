@@ -3,17 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tradutor Green 8ª ed.</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232E74B5'/><text x='16' y='22' font-size='16' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'>PT</text></svg>">
+<title>Tradutor da Vivi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23ffd6e8'/><text x='16' y='23' font-size='18' text-anchor='middle' fill='%23ff5fa2' font-family='Arial' font-weight='bold'>♥</text></svg>">
 <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
 <header>
   <div class="marca">
-    <span class="selo">PT</span>
+    <svg class="mascote" viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M8 16c8-4 16-4 24 2 8-6 16-6 24-2v34c-8-4-16-4-24 2-8-6-16-6-24-2z" fill="#fff" stroke="#e8579b" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M32 18v34" stroke="#e8579b" stroke-width="2.5"/>
+      <circle cx="21" cy="31" r="2.4" fill="#5a2a44"/><circle cx="43" cy="31" r="2.4" fill="#5a2a44"/>
+      <ellipse cx="16" cy="37" rx="3.6" ry="2.2" fill="#ffb3d1"/><ellipse cx="48" cy="37" rx="3.6" ry="2.2" fill="#ffb3d1"/>
+      <path d="M27 38q5 4 10 0" fill="none" stroke="#5a2a44" stroke-width="2" stroke-linecap="round"/>
+      <path d="M32 4c-2-3-7-2-7 2 0 4 7 7 7 7s7-3 7-7c0-4-5-5-7-2z" fill="#ff5fa2"/>
+    </svg>
     <div>
-      <h1>Tradutor do Green</h1>
-      <p>Green's Operative Hand Surgery · 8ª edição → português</p>
+      <h1>Tradutor da Vivi <span class="coracao">♡</span></h1>
+      <p>Green's Operative Hand Surgery · 8ª edição → português ✿</p>
     </div>
   </div>
   <button id="sair" class="discreto" hidden>Sair</button>
@@ -22,7 +32,7 @@
 <main>
   <!-- Login -->
   <section id="tela-login" class="cartao estreito" hidden>
-    <h2>Entrar</h2>
+    <h2>Oi, Vivi! ♡</h2>
     <form id="form-login">
       <label for="senha">Senha</label>
       <input id="senha" type="password" autocomplete="current-password" required>
@@ -35,7 +45,7 @@
   <section id="tela-app" hidden>
     <div class="grade">
       <div class="cartao">
-        <h2>1. Capítulo</h2>
+        <h2><span class="num">1</span> Capítulo</h2>
         <label for="capitulo">Escolha o capítulo</label>
         <select id="capitulo"></select>
         <p id="info-cap" class="dica"></p>
@@ -65,7 +75,7 @@
       </div>
 
       <div class="cartao">
-        <h2>2. Progresso</h2>
+        <h2><span class="num">2</span> Progresso</h2>
         <div class="barra"><div id="barra"></div></div>
         <p id="status" class="status">Escolha um capítulo e clique em Traduzir.</p>
         <ol id="log" class="log"></ol>
@@ -86,7 +96,7 @@
     </div>
 
     <div class="cartao">
-      <h2>Prévia da tradução</h2>
+      <h2>✿ Prévia da tradução</h2>
       <div id="previa" class="previa"><p class="dica">A tradução aparece aqui conforme fica pronta.</p></div>
     </div>
   </section>

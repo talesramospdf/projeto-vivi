@@ -136,7 +136,7 @@ function atualizarResumo() {
   const feitos = ts.filter((t) => guardar.ler(chave(cap, t.tam, t.ini))).length;
   $("info-cap").textContent = `${cap.paginas} páginas · ${cap.tamanho_mb} MB · ${ts.length} envios ao Gemini`;
   barra(feitos / ts.length);
-  if (feitos === ts.length) status("Tradução completa. Baixe o Word.");
+  if (feitos === ts.length) status("Tradução completa! ♡ Agora é só baixar o Word.");
   else if (feitos) status(`${feitos} de ${ts.length} trechos prontos. Clique em Traduzir para continuar.`);
   else status("Pronto para traduzir.");
   $("btn-traduzir").textContent = feitos && feitos < ts.length ? "Continuar" : "Traduzir";
@@ -293,7 +293,7 @@ $("btn-traduzir").addEventListener("click", async () => {
       barra((i + 1) / lista.length);
       mostrarPrevia();
     }
-    status("Tradução completa. Baixe o Word.");
+    status("Tradução completa! ♡ Agora é só baixar o Word.");
     log("Capítulo concluído.", "ok");
   } catch (e) {
     if (e.message === "PAUSADO") { status("Pausado. Clique em Continuar quando quiser."); log("Pausado."); }
@@ -389,7 +389,7 @@ $("btn-word").addEventListener("click", async () => {
     a.download = `Cap ${Number(estado.cap.id)} - Green 8ED.docx`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-    status("Word baixado ✓");
+    status("Word baixado ♡ Bons estudos, Vivi!");
   } catch (e) {
     status("Erro ao gerar o Word: " + e.message); log(e.message, "erro");
   } finally { btn.disabled = false; }
