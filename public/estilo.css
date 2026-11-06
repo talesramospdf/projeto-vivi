@@ -271,3 +271,4 @@ body.trabalhando .mascote { animation-duration: .7s; }
 .opcao small { font-weight: 400; font-size: 12px; color: var(--suave); line-height: 1.35; }
 .opcao:has(input:checked) { border-color: var(--rosa); background: var(--rosa-claro); box-shadow: 0 0 0 3px rgba(255, 95, 162, .15); }
 @media (max-width: 520px) { .metodo { grid-template-columns: 1fr; } }
+.mini-botao { margin-left: 6px; padding: 1px 10px; font-size: 12px; border-width: 1.5px; background: var(--rosa); color: #fff; border-color: var(--rosa); }

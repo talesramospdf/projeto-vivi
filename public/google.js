@@ -18,24 +18,36 @@ function lerGlossario(texto) {
 }
 const aplicarGlossario = (t, g) => g.reduce((s, [re, pt]) => s.replace(re, pt), t);
 
-// envia um lote de textos (separados por linha) ao Google, pelo Worker; se falhar, tenta direto
+// envia um lote de textos (separados por linha) ao Google. Tenta vários caminhos e lembra o que funcionou:
+//  1) direto do navegador (GET)   2) direto do navegador (POST)   3) pelo Worker   4) endpoint do Chrome
+const GT = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t";
+const lerGtx = (d) => (d?.[0] || []).map((s) => s?.[0] || "").join("");
+const lerChrome = (d) => (Array.isArray(d) ? d.map((x) => (Array.isArray(x) ? x[0] : x)).join("") : String(d || ""));
+const CAMINHOS = {
+  get: async (q) => { const u = `${GT}&q=${encodeURIComponent(q)}`; if (u.length > 7500) throw new Error("longo"); const r = await fetch(u); if (!r.ok) throw new Error("HTTP " + r.status); return lerGtx(await r.json()); },
+  post: async (q) => { const r = await fetch(GT, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded;charset=UTF-8" }, body: new URLSearchParams({ q }).toString() }); if (!r.ok) throw new Error("HTTP " + r.status); return lerGtx(await r.json()); },
+  worker: async (q, api) => { const r = await api("/api/google", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded;charset=UTF-8" }, body: new URLSearchParams({ q }).toString() }); if (!r.ok) throw new Error("HTTP " + r.status); return lerGtx(await r.json()); },
+  chrome: async (q) => { const u = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=en&tl=pt&q=${encodeURIComponent(q)}`; if (u.length > 7500) throw new Error("longo"); const r = await fetch(u); if (!r.ok) throw new Error("HTTP " + r.status); return lerChrome(await r.json()); },
+};
+let caminhoBom = null;
+try { caminhoBom = localStorage.getItem("googleCaminho"); } catch {}
+
 async function lote(textos, api) {
-  const corpo = new URLSearchParams({ q: textos.join("\n") }).toString();
-  const ler = (d) => (d?.[0] || []).map((s) => s?.[0] || "").join("");
-  for (let tent = 1; tent <= 5; tent++) {
-    try {
-      const r = await api("/api/google", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded;charset=UTF-8" }, body: corpo });
-      if (r.ok) return ler(await r.json()).split("\n");
-      if (r.status !== 429 && r.status < 500) throw new Error("HTTP " + r.status);
-    } catch (e) {
-      try { // plano B: direto do navegador
-        const r2 = await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded;charset=UTF-8" }, body: corpo });
-        if (r2.ok) return ler(await r2.json()).split("\n");
-      } catch {}
+  const q = textos.join("\n");
+  const ordem = [...new Set([caminhoBom, "get", "post", "worker", "chrome"].filter(Boolean))];
+  const erros = [];
+  for (let rodada = 1; rodada <= 3; rodada++) {
+    for (const nome of ordem) {
+      try {
+        const t = await CAMINHOS[nome](q, api);
+        if (!t) throw new Error("resposta vazia");
+        if (caminhoBom !== nome) { caminhoBom = nome; try { localStorage.setItem("googleCaminho", nome); } catch {} }
+        return t.split("\n");
+      } catch (e) { erros.push(`${nome}: ${e.message === "Failed to fetch" ? "bloqueado pelo navegador" : e.message}`); }
     }
-    await new Promise((r) => setTimeout(r, 1500 * tent));
+    await new Promise((r) => setTimeout(r, 2000 * rodada));
   }
-  throw new Error("O Google Tradutor não respondeu. Tente de novo daqui a pouco.");
+  throw new Error("O Google Tradutor não respondeu (" + [...new Set(erros)].slice(-4).join("; ") + ").");
 }
 
 // traduz uma lista de textos mantendo a ordem (lotes de até ~4500 caracteres)
@@ -45,7 +57,7 @@ async function traduzirTextos(textos, api, progresso) {
   let i = 0, feitos = 0;
   while (i < idx.length) {
     const grupo = []; let tam = 0;
-    while (i < idx.length && (grupo.length === 0 || tam + idx[i][0].length < 4500)) { grupo.push(idx[i]); tam += idx[i][0].length + 1; i++; }
+    while (i < idx.length && (grupo.length === 0 || tam + idx[i][0].length < 1800)) { grupo.push(idx[i]); tam += idx[i][0].length + 1; i++; }
     const textosGrupo = grupo.map(([t]) => t.replace(/\n/g, " "));
     let res = await lote(textosGrupo, api);
     if (res.length !== grupo.length) { // o Google juntou/partiu linhas: traduz um por um

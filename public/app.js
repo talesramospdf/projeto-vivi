@@ -231,7 +231,8 @@ function desenharFila() {
     const atual = st.atual && st.atual.arquivo === it.arquivo;
     if (it.status === "enviando") {
       texto = estado.enviando === it.arquivo ? (it.metodo === "google" ? "Traduzindo com o Google Tradutor…" : "Enviando páginas…")
-        : `Interrompido (o site foi fechado). Selecione o capítulo e clique em <b>Colocar na fila</b> de novo.`;
+        : it.erro ? `Deu erro: ${esc(it.erro)} <button data-a="tentar" class="mini-botao">Tentar de novo</button>`
+        : `Parou no meio (o site foi fechado ou recarregado). <button data-a="tentar" class="mini-botao">Continuar</button>`;
       classe = "alerta";
     }
     else if (it.feitos >= it.total) { texto = "Pronto ✓"; classe = "pronto"; }
@@ -250,6 +251,11 @@ $("lista-fila").addEventListener("click", async (ev) => {
   const arq = b.closest("li").dataset.arq;
   const ordem = estado.fila.itens.map((i) => i.arquivo);
   const i = ordem.indexOf(arq);
+  if (b.dataset.a === "tentar") {
+    const item = estado.fila.itens.find((i) => i.arquivo === arq);
+    if (!estado.envios.some((e) => e.arquivo === arq)) estado.envios.push({ arquivo: arq, metodo: item?.metodo || metodoEscolhido() });
+    desenharFila(); processarEnvios(); return;
+  }
   if (b.dataset.a === "tira") {
     if (!confirm("Tirar este capítulo da fila? O que já foi traduzido fica guardado.")) return;
     await api("/api/fila/" + enc(arq) + "?manter=1", { method: "DELETE" });
@@ -305,7 +311,14 @@ async function processarEnvios() {
       estado.enviando = arq; estado.metodoEnvio = metodo; desenharFaixa(); desenharFila(); desenharCapitulos();
       const cap = estado.caps.find((c) => c.arquivo === arq);
       try { await (metodo === "google" ? traduzirComGoogle(cap) : enviarCapitulo(cap)); }
-      catch (e) { alert(`Não consegui enviar o capítulo: ${e.message}\nVocê pode tentar de novo depois.`); }
+      catch (e) {
+        // guarda o erro no capítulo da fila, para aparecer na tela com o botão "Tentar de novo"
+        try {
+          const caminho = "/api/fila/" + enc(arq);
+          const info = await (await api(caminho)).json();
+          if (info.job) await api(caminho + "/job", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...info.job, erro: e.message, metodo }) });
+        } catch {}
+      }
       estado.envios.shift();
     }
   } finally {

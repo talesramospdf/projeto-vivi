@@ -56,7 +56,7 @@ export async function verFila(env) {
     if (!job) continue;
     const res = await listar(env, P(arq) + "res/");
     const reqs = job.status === "enviando" ? (await listar(env, P(arq) + "req/")).length : job.trechos.length;
-    itens.push({ arquivo: arq, id: job.id, titulo: job.titulo, total: job.trechos.length, feitos: res.length, enviados: reqs, status: job.status, metodo: job.metodo || "gemini" });
+    itens.push({ arquivo: arq, id: job.id, titulo: job.titulo, total: job.trechos.length, feitos: res.length, enviados: reqs, status: job.status, metodo: job.metodo || "gemini", erro: job.status === "enviando" ? job.erro || null : null });
   }
   return Response.json({ itens, status, estado, agora: agora() });
 }
