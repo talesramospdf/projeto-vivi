@@ -2,6 +2,7 @@ name = "projeto-vivi"
 main = "src/worker.js"
 compatibility_date = "2025-01-01"
 workers_dev = true    # mantém o link projeto-vivi.<conta>.workers.dev ligado
+keep_vars = true      # não apaga variáveis cadastradas no painel a cada deploy
 
 # Arquivos do site (HTML, JS, CSS)
 [assets]
