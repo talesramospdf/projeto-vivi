@@ -120,7 +120,7 @@ export async function gerarDocx(blocos, figuras) {
       default: {
         if (!t && !b.destaque) break;
         const kids = [];
-        if (b.destaque) kids.push(arial(b.destaque.trim() + " ", { color: COR.destaque }));
+        if (b.destaque) kids.push(arial(b.destaque.trim() + " ", { color: b.destaqueCor || COR.destaque }));
         kids.push(arial(t));
         filhos.push(par(kids));
       }

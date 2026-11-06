@@ -2,6 +2,8 @@ import * as pdfjs from "./vendor/pdf.min.js";
 import { gerarDocx } from "./word.js";
 import { SCHEMA, montarPrompt } from "./prompt.js";
 import { criarEditor } from "./editor.js";
+import { extrairCapitulo } from "./extrair.js";
+import { traduzirBlocosGoogle } from "./google.js";
 
 pdfjs.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.js";
 
@@ -119,9 +121,9 @@ function situacao(cap) {
   const item = estado.fila.itens.find((i) => i.arquivo === cap.arquivo);
   const total = trechosDe(cap).length;
   if (estado.enviando === cap.arquivo) return { tipo: "fila", rotulo: "Enviando…", classe: "enviando" };
-  if (estado.envios.includes(cap.arquivo)) return { tipo: "fila", rotulo: "Aguardando envio", classe: "fila" };
+  if (estado.envios.some((e) => e.arquivo === cap.arquivo)) return { tipo: "fila", rotulo: "Aguardando", classe: "fila" };
   if (item) {
-    if (item.status === "enviando") return { tipo: "fila", rotulo: `Envio incompleto (${item.enviados}/${item.total})`, classe: "alerta" };
+    if (item.status === "enviando") return { tipo: "fila", rotulo: item.metodo === "google" ? "Google: incompleto" : `Envio incompleto (${item.enviados}/${item.total})`, classe: "alerta" };
     return { tipo: "fila", rotulo: `Na fila · ${Math.round((item.feitos / item.total) * 100)}%`, classe: "fila", progresso: item.feitos / item.total };
   }
   if (e.manual) return { tipo: "pronto", rotulo: "Feito à mão ✓", classe: "manual" };
@@ -189,7 +191,8 @@ function desenharFaixa() {
   const pend = itens.filter((i) => i.status === "pronto" && i.feitos < i.total);
   $("btn-acordar").hidden = true;
   if (estado.enviando) {
-    faixa("⬆", "Enviando páginas para o tradutor…", "Mantenha o site aberto até o envio terminar. Depois a tradução continua sozinha.", "enviando");
+    if (estado.metodoEnvio === "google") faixa("⏳", "Traduzindo com o Google Tradutor…", "Mantenha o site aberto até terminar (costuma levar poucos minutos por capítulo).", "enviando");
+    else faixa("⬆", "Enviando páginas para o tradutor…", "Mantenha o site aberto até o envio terminar. Depois a tradução continua sozinha.", "enviando");
   } else if (!pend.length) {
     faixa("♡", itens.length ? "Fila concluída!" : "Tudo tranquilo por aqui", "Coloque capítulos na fila para traduzir em segundo plano.", "");
   } else if (st.pausaAte && st.pausaAte > relogio) {
@@ -211,7 +214,7 @@ $("btn-acordar").addEventListener("click", async () => {
 // ---------- fila ----------
 function desenharFila() {
   const { itens, status: st } = estado.fila;
-  const locais = estado.envios.filter((a) => !itens.some((i) => i.arquivo === a));
+  const locais = estado.envios.map((e) => e.arquivo).filter((a) => !itens.some((i) => i.arquivo === a));
   $("fila-vazia").hidden = itens.length + locais.length > 0;
   const linha = (arq, titulo, id, texto, frac, classe, botoes) => `
     <li class="item-fila ${classe}" data-arq="${esc(arq)}">
@@ -226,14 +229,20 @@ function desenharFila() {
   $("lista-fila").innerHTML = itens.map((it, i) => {
     let texto, classe = "";
     const atual = st.atual && st.atual.arquivo === it.arquivo;
-    if (it.status === "enviando") { texto = estado.enviando === it.arquivo ? "Enviando páginas…" : `Envio interrompido (${it.enviados}/${it.total}). Clique em <b>Colocar na fila</b> de novo para terminar.`; classe = "alerta"; }
+    if (it.status === "enviando") {
+      texto = estado.enviando === it.arquivo ? (it.metodo === "google" ? "Traduzindo com o Google Tradutor…" : "Enviando páginas…")
+        : `Interrompido (o site foi fechado). Selecione o capítulo e clique em <b>Colocar na fila</b> de novo.`;
+      classe = "alerta";
+    }
     else if (it.feitos >= it.total) { texto = "Pronto ✓"; classe = "pronto"; }
     else if (atual) { texto = `Traduzindo agora as páginas ${st.atual.ini}–${st.atual.fim} · ${it.feitos} de ${it.total} trechos prontos`; classe = "atual"; }
     else texto = `${it.feitos} de ${it.total} trechos prontos · aguardando a vez`;
+    if (it.metodo === "google") texto = "Google Tradutor · " + texto;
     return linha(it.arquivo, it.titulo, it.id, texto, it.status === "enviando" ? it.enviados / it.total : it.feitos / it.total, classe, btns(i, itens.length));
   }).join("") + locais.map((a) => {
     const c = estado.caps.find((x) => x.arquivo === a);
-    return linha(a, c.titulo, c.id, estado.enviando === a ? "Enviando páginas…" : "Aguardando envio (o site precisa estar aberto)", 0, "local", "");
+    const e = estado.envios.find((x) => x.arquivo === a);
+    return linha(a, c.titulo, c.id, estado.enviando === a ? "Preparando…" : `Aguardando a vez (${e.metodo === "google" ? "Google Tradutor" : "Gemini"}) · deixe o site aberto`, 0, "local", "");
   }).join("");
 }
 $("lista-fila").addEventListener("click", async (ev) => {
@@ -267,13 +276,19 @@ async function atualizarFila() {
 }
 
 // ---------- colocar na fila (prepara as páginas e envia ao Cloudflare) ----------
+const metodoEscolhido = () => document.querySelector('input[name="metodo"]:checked')?.value || "gemini";
+document.querySelectorAll('input[name="metodo"]').forEach((r) => {
+  if (r.value === guardar.ler("metodo", "gemini")) r.checked = true;
+  r.addEventListener("change", () => guardar.gravar("metodo", metodoEscolhido()));
+});
 $("btn-enfileirar").addEventListener("click", () => {
-  const novos = [...estado.selecao].filter((a) => !estado.envios.includes(a) && estado.enviando !== a);
+  const novos = [...estado.selecao].filter((a) => !estado.envios.some((e) => e.arquivo === a) && estado.enviando !== a);
   const jaProntos = novos.filter((a) => situacao(estado.caps.find((c) => c.arquivo === a)).tipo === "pronto");
   if (jaProntos.length && !confirm(`${jaProntos.length} capítulo(s) já estão prontos ou feitos à mão. Traduzir de novo mesmo assim?`)) {
     novos.splice(0, novos.length, ...novos.filter((a) => !jaProntos.includes(a)));
   }
-  estado.envios.push(...novos);
+  const metodo = metodoEscolhido();
+  estado.envios.push(...novos.map((arquivo) => ({ arquivo, metodo })));
   estado.selecao.clear();
   desenharCapitulos(); desenharFila();
   processarEnvios();
@@ -286,9 +301,10 @@ async function processarEnvios() {
   window.addEventListener("beforeunload", avisoSaida);
   try {
     while (estado.envios.length) {
-      const arq = estado.envios[0];
-      estado.enviando = arq; desenharFaixa(); desenharFila(); desenharCapitulos();
-      try { await enviarCapitulo(estado.caps.find((c) => c.arquivo === arq)); }
+      const { arquivo: arq, metodo } = estado.envios[0];
+      estado.enviando = arq; estado.metodoEnvio = metodo; desenharFaixa(); desenharFila(); desenharCapitulos();
+      const cap = estado.caps.find((c) => c.arquivo === arq);
+      try { await (metodo === "google" ? traduzirComGoogle(cap) : enviarCapitulo(cap)); }
       catch (e) { alert(`Não consegui enviar o capítulo: ${e.message}\nVocê pode tentar de novo depois.`); }
       estado.envios.shift();
     }
@@ -321,6 +337,7 @@ async function enviarCapitulo(cap) {
   await atualizarFila();
 
   $("envio").hidden = false;
+  $("aviso-envio").textContent = "⚠ Mantenha o site aberto só até terminar este envio. Depois pode fechar.";
   $("envio-titulo").textContent = `Capítulo ${Number(cap.id)}: baixando o PDF…`;
   $("envio-barra").style.width = "0%";
   const pdfDoc = await abrirPdf(cap, (p) => { $("envio-titulo").textContent = `Capítulo ${Number(cap.id)}: baixando o PDF… ${p}%`; });
@@ -354,6 +371,49 @@ async function enviarCapitulo(cap) {
   job.status = "pronto";
   await api(caminho + "/job", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(job) });
   $("envio-titulo").textContent = `Capítulo ${Number(cap.id)} enviado ✓`;
+}
+
+// ---------- modo Google Tradutor: lê o texto do PDF, traduz e salva (com o site aberto) ----------
+async function traduzirComGoogle(cap) {
+  const ts = trechosDe(cap);
+  const caminho = "/api/fila/" + enc(cap.arquivo);
+  const job = { id: cap.id, titulo: cap.titulo, paginas: cap.paginas, trechos: ts, metodo: "google", status: "enviando", criado: Date.now() };
+  await api(caminho + "/job", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(job) });
+  await atualizarFila();
+  $("envio").hidden = false; $("envio-barra").style.width = "0%";
+  $("aviso-envio").textContent = "⚠ Mantenha o site aberto até o Google terminar este capítulo (poucos minutos).";
+  const titulo = (t) => { $("envio-titulo").textContent = `Capítulo ${Number(cap.id)}: ${t}`; };
+  titulo("baixando o PDF…");
+  const pdfDoc = await abrirPdf(cap, (p) => titulo(`baixando o PDF… ${p}%`));
+  const ingles = await extrairCapitulo(pdfDoc, async (n) => agrupar(await retangulosDeImagens(n)), (n, total) => {
+    titulo(`lendo a página ${n} de ${total}`); $("envio-barra").style.width = `${Math.round((n / total) * 30)}%`;
+    if (n === 1 || n % 4 === 0) renderizar(pdfDoc, n, 300).then((c) => { $("miniatura").src = c.toDataURL("image/jpeg", 0.7); $("mini-pag").textContent = `pág. ${n}`; });
+  });
+  const pt = await traduzirBlocosGoogle(ingles, {
+    api, glossario: $("glossario").value,
+    progresso: (f, total) => { titulo(`traduzindo com o Google (${f} de ${total} trechos de texto)`); $("envio-barra").style.width = `${30 + Math.round((f / total) * 60)}%`; },
+  });
+  // guarda por trecho de páginas, no mesmo formato do Gemini (editor e Word funcionam igual)
+  titulo("salvando…");
+  const porTrecho = new Map(ts.map((t) => [t.ini, []]));
+  for (const b of pt) {
+    const pag = b._pag || b.figura?.pagina || 1;
+    const ini = Math.floor((pag - 1) / TAM) * TAM + 1;
+    const { _pag, ...limpo } = b;
+    (porTrecho.get(ini) || porTrecho.get(ts[ts.length - 1].ini)).push(limpo);
+  }
+  let n = 0;
+  for (const t of ts) {
+    const blocos = porTrecho.get(t.ini) || [];
+    guardar.gravar(chave(cap, t.ini), blocos);
+    await api(`${caminho}/res/${t.ini}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ ini: t.ini, fim: t.fim, metodo: "google", blocos }) });
+    $("envio-barra").style.width = `${90 + Math.round((++n / ts.length) * 10)}%`;
+  }
+  job.status = "pronto";
+  await api(caminho + "/job", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(job) });
+  await api("/api/fila/acordar", { method: "POST" }).catch(() => {}); // fecha o capítulo na hora
+  titulo("pronto ✓");
+  if (estado.cap?.arquivo === cap.arquivo) { await editor.apagar(cap.arquivo); atualizarCapitulo(); }
 }
 
 // ---------- PDF ----------
@@ -598,7 +658,7 @@ $("btn-limpar").addEventListener("click", async () => {
     for (const t of trechosDe(cap)) guardar.apagar(chave(cap, t.ini));
     await editor.apagar(cap.arquivo);
   }
-  estado.envios.push(cap.arquivo);
+  estado.envios.push({ arquivo: cap.arquivo, metodo: metodoEscolhido() });
   atualizarCapitulo(); desenharFila(); processarEnvios();
 });
 

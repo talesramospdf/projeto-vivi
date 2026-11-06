@@ -63,6 +63,13 @@
         <ul id="lista-caps" class="lista-caps"></ul>
         <div id="acoes-sel" class="acoes-sel" hidden>
           <span id="qtd-sel"></span>
+          <fieldset class="metodo">
+            <legend>Traduzir com:</legend>
+            <label class="opcao"><input type="radio" name="metodo" value="gemini" checked>
+              <span><b>✿ Gemini</b><small>Tradução melhor e já organizada · roda em segundo plano (pode fechar o site)</small></span></label>
+            <label class="opcao"><input type="radio" name="metodo" value="google">
+              <span><b>Google Tradutor</b><small>Mais rápido, igual ao plugin · deixe o site aberto até terminar (poucos minutos)</small></span></label>
+          </fieldset>
           <button id="btn-enfileirar" class="primario">Colocar na fila</button>
           <button id="btn-marcar">Marcar como já feito</button>
           <button id="btn-desmarcar" class="discreto">Desmarcar</button>
@@ -78,7 +85,7 @@
           <div class="ativ-texto">
             <p id="envio-titulo" class="etapa">Preparando…</p>
             <div class="barra"><div id="envio-barra"></div></div>
-            <p class="aviso-envio">⚠ Mantenha o site aberto só até terminar este envio. Depois pode fechar.</p>
+            <p id="aviso-envio" class="aviso-envio">⚠ Mantenha o site aberto só até terminar este envio. Depois pode fechar.</p>
           </div>
         </div>
         <ol id="lista-fila" class="lista-fila"></ol>

@@ -11,6 +11,8 @@ Site que traduz os capítulos do *Green's Operative Hand Surgery* para o portugu
 
 **Tradução em segundo plano:** ao clicar em "Colocar na fila", o site prepara as páginas de cada trecho e guarda no R2 (é a única parte que precisa do site aberto). Um Cron do Cloudflare roda a cada minuto (`[triggers]` no `wrangler.toml`, grátis), manda os trechos ao Gemini e guarda os resultados em `fila/<capítulo>/res/` — funciona com o site fechado e troca de modelo sozinho quando o Gemini está lotado. Capítulos podem ser marcados como "feito à mão" (`estado/capitulos.json`).
 
+**Modo Google Tradutor:** alternativa ao Gemini, escolhida ao colocar na fila. O site lê o texto do PDF (`public/extrair.js` reconstrói a estrutura pela fonte de cada linha: títulos, legendas com a figura, tabelas, quadros, listas), traduz com o Google Tradutor (`public/google.js`, via `/api/google`) e salva no mesmo formato do Gemini. Precisa do site aberto até terminar (poucos minutos por capítulo).
+
 O editor (revisão antes do Word) guarda as edições no navegador (IndexedDB).
 
 ## Estrutura

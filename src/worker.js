@@ -3,6 +3,7 @@ import { pdf } from "./pdf.js";
 import { lerGlossario, salvarGlossario } from "./glossario.js";
 import { modelos } from "./modelos.js";
 import { traduzir } from "./traduzir.js";
+import { google } from "./google.js";
 import {
   verFila, verCapitulo, guardarPedido, lerResultado, apagarResultado, guardarResultado, guardarJob,
   reordenar, removerDaFila, marcar, acordar, processarFila,
@@ -31,6 +32,7 @@ export default {
       if (caminho === "/api/modelos" && m === "GET") return await modelos(env);
       if (caminho === "/api/traduzir" && m === "POST") return await traduzir(env, request, url);
       if (caminho === "/api/estado" && m === "PUT") return await marcar(env, request);
+      if (caminho === "/api/google" && m === "POST") return await google(request, env);
 
       // fila
       if (partes[0] === "fila") {
