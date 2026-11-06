@@ -7,7 +7,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.js";
 const $ = (id) => document.getElementById(id);
 const LARG_ENVIO = 1600;   // largura (px) das imagens das páginas enviadas ao Gemini
 const LARG_FIGURA = 2200;  // largura (px) usada para recortar as figuras do Word
-const MAX_TENTATIVAS = 6;
+const MAX_TENTATIVAS = 10;
 
 const estado = { caps: [], cap: null, pdf: null, pdfDe: null, rodando: false, parar: false };
 
@@ -77,6 +77,7 @@ async function carregarModelos() {
     const r = await api("/api/modelos"); const d = await r.json();
     if (!r.ok) throw new Error(d.erro);
     const lista = d.modelos;
+    estado.modelos = lista;
     const salvo = guardar.ler("modelo", null);
     const sugestao = d.padrao && lista.includes(d.padrao) ? d.padrao : escolherPadrao(lista);
     sel.innerHTML = lista.map((m) => `<option>${m}</option>`).join("");
@@ -93,7 +94,7 @@ function escolherPadrao(lista) {
   const pool = flash.length ? flash : lista;
   return pool.sort((a, b) => versao(b) - versao(a) || a.length - b.length)[0];
 }
-$("modelo").addEventListener("change", () => guardar.gravar("modelo", $("modelo").value));
+$("modelo").addEventListener("change", () => { guardar.gravar("modelo", $("modelo").value); estado.modeloAtivo = null; });
 $("tam").addEventListener("change", () => { guardar.gravar("tam", Number($("tam").value)); atualizarResumo(); });
 
 // ---------- glossário ----------
@@ -215,9 +216,20 @@ async function chamarGemini(paginas, anterior) {
     generationConfig: { temperature: 0.2, maxOutputTokens: 60000, responseMimeType: "application/json", responseSchema: SCHEMA },
     safetySettings: ["HARASSMENT", "HATE_SPEECH", "SEXUALLY_EXPLICIT", "DANGEROUS_CONTENT"].map((k) => ({ category: "HARM_CATEGORY_" + k, threshold: "BLOCK_NONE" })),
   });
-  const rota = "/api/traduzir?modelo=" + encodeURIComponent($("modelo").value);
+  let modelo = estado.modeloAtivo || $("modelo").value;
+  const tentados = new Set([modelo]);
+  let sobrecargas = 0;
+  // troca para o próximo modelo da lista de reserva (se houver)
+  const trocarModelo = (motivo) => {
+    const prox = reservas($("modelo").value).find((m) => !tentados.has(m));
+    if (!prox) return false;
+    log(`${modelo} ${motivo}; trocando para ${prox}.`);
+    modelo = prox; tentados.add(prox); estado.modeloAtivo = prox; sobrecargas = 0;
+    return true;
+  };
   for (let tent = 1; tent <= MAX_TENTATIVAS; tent++) {
     if (estado.parar) throw new Error("PAUSADO");
+    const rota = "/api/traduzir?modelo=" + encodeURIComponent(modelo);
     let r, d;
     try {
       r = await api(rota, { method: "POST", headers: { "content-type": "application/json" }, body: corpo });
@@ -231,11 +243,29 @@ async function chamarGemini(paginas, anterior) {
     // Resposta grande demais: o chamador divide em páginas avulsas
     if (d.motivo === "MAX_TOKENS" && paginas.length > 1) throw Object.assign(new Error("GRANDE"), { grande: true });
     if (r.status === 429) {
-      if (/limit:\s*0\b/.test(d.erro || "")) throw new Error(`Este modelo não está liberado no plano grátis. Troque o modelo em Opções. (${d.erro})`);
+      const semCota = /limit:\s*0\b/.test(d.erro || "");
+      const diario = /per ?day|PerDay|daily/i.test(d.erro || "");
+      if (semCota || diario) {
+        if (trocarModelo(semCota ? "não está liberado no plano grátis" : "atingiu o limite de hoje")) { tent--; continue; }
+        throw new Error(diario
+          ? "Limite diário do Gemini atingido em todos os modelos. Continue amanhã (o progresso fica salvo)."
+          : `Nenhum modelo liberado no plano grátis. (${d.erro})`);
+      }
       const s = Math.min(Math.max(d.esperar || 30, 10), 120) + 2;
-      if (/per day|PerDay/i.test(d.erro || "")) throw new Error("Limite diário do Gemini atingido. Continue amanhã (o progresso fica salvo) ou troque o modelo em Opções.");
       log(`Limite por minuto do Gemini. Esperando ${Math.round(s)} s…`);
       status(`Aguardando o limite do Gemini (${Math.round(s)} s)…`);
+      await esperar(s * 1000);
+      tent--; // esperar o limite por minuto não conta como falha
+      continue;
+    }
+    // "muita demanda" / sobrecarga do Google: espera cada vez mais e, depois de 2 seguidas, troca de modelo
+    const sobrecarga = d.status === 503 || d.status === 500 || /overload|high demand|unavailable|try again later/i.test(d.erro || "");
+    if (sobrecarga) {
+      sobrecargas++;
+      if (sobrecargas >= 2 && trocarModelo("está com muita demanda")) { continue; }
+      const s = Math.min(15 * 2 ** (sobrecargas - 1), 90);
+      log(`Gemini com muita demanda. Tentando de novo em ${s} s…`);
+      status(`Gemini ocupado, aguardando ${s} s…`);
       await esperar(s * 1000);
       continue;
     }
@@ -246,7 +276,17 @@ async function chamarGemini(paginas, anterior) {
     }
     throw new Error(d.erro || "Erro desconhecido.");
   }
-  throw new Error("O Gemini falhou várias vezes seguidas. Clique em Continuar daqui a pouco.");
+  throw new Error("O Gemini falhou várias vezes seguidas. Clique em Continuar daqui a pouco (o progresso fica salvo).");
+}
+
+// ordem de reserva: o escolhido, depois os "flash" mais novos, depois os "flash-lite"
+function reservas(escolhido) {
+  const lista = estado.modelos || [];
+  const versao = (n) => parseFloat((n.match(/gemini-(\d+(\.\d+)?)/) || [])[1] || 0);
+  const ordem = (f) => lista.filter(f).sort((a, b) => versao(b) - versao(a) || a.length - b.length);
+  const flash = ordem((n) => /flash/.test(n) && !/lite/.test(n) && !/preview|thinking/.test(n));
+  const lite = ordem((n) => /flash-lite/.test(n) && !/preview/.test(n));
+  return [...new Set([escolhido, ...flash, ...lite])];
 }
 
 // converte a página da figura (1 = primeira imagem enviada) para a página do PDF
