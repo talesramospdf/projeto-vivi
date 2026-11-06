@@ -44,13 +44,13 @@ function tabela(b) {
 }
 
 function imagem(fig) {
-  let w = Math.min(LARG_COLUNA_PX, fig.largura);
+  let w = Math.min(Math.round(LARG_COLUNA_PX * (fig.escala || 1)), fig.largura);
   let h = Math.round((fig.altura * w) / fig.largura);
   if (h > 520) { w = Math.round((w * 520) / h); h = 520; }
   return new D.Paragraph({
     alignment: D.AlignmentType.CENTER,
     spacing: { before: 80, after: 60 },
-    children: [new D.ImageRun({ type: "jpg", data: fig.dados, transformation: { width: w, height: h } })],
+    children: [new D.ImageRun({ type: fig.tipo || "jpg", data: fig.dados, transformation: { width: w, height: h } })],
   });
 }
 

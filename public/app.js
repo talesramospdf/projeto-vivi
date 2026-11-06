@@ -1,6 +1,7 @@
 import * as pdfjs from "./vendor/pdf.min.js";
 import { gerarDocx } from "./word.js";
 import { SCHEMA, montarPrompt } from "./prompt.js";
+import { criarEditor } from "./editor.js";
 
 pdfjs.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.js";
 
@@ -10,6 +11,7 @@ const LARG_FIGURA = 2200;  // largura (px) usada para recortar as figuras do Wor
 const MAX_TENTATIVAS = 10;
 
 const estado = { caps: [], cap: null, pdf: null, pdfDe: null, rodando: false, parar: false };
+let editor; // criado depois que as funções abaixo existem
 
 // ---------- utilidades ----------
 const guardar = {
@@ -145,8 +147,9 @@ function atualizarResumo() {
   mostrarPrevia();
 }
 
-$("btn-limpar").addEventListener("click", () => {
-  if (!confirm("Apagar a tradução salva deste capítulo e começar do zero?")) return;
+$("btn-limpar").addEventListener("click", async () => {
+  if (!confirm("Apagar a tradução salva deste capítulo (e as edições) e começar do zero?")) return;
+  await editor.apagar(estado.cap.arquivo);
   for (let i = localStorage.length - 1; i >= 0; i--) {
     const k = localStorage.key(i);
     if (k && k.startsWith(`trad:${estado.cap.arquivo}:`)) localStorage.removeItem(k);
@@ -367,10 +370,21 @@ function blocosDoCapitulo() {
 }
 
 const esc = (s) => String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function capituloCompleto() {
+  if ($("pag-ini").value || $("pag-fim").value) return false;
+  const ts = trechos();
+  return ts.length > 0 && ts.every((t) => guardar.ler(chave(estado.cap, t.tam, t.ini)));
+}
+
 function mostrarPrevia() {
   const bl = blocosDoCapitulo();
+  const completo = !estado.rodando && capituloCompleto();
+  $("titulo-previa").textContent = completo ? "✿ Editor do capítulo" : "✿ Prévia da tradução";
+  $("dica-editor").hidden = !completo; $("btn-resetar").hidden = !completo;
+  if (completo) { editor.abrir(estado.cap.arquivo, bl).catch((e) => log("Erro ao abrir o editor: " + e.message, "erro")); return; }
+  editor.fechar();
   if (!bl.length) { $("previa").innerHTML = '<p class="dica">A tradução aparece aqui conforme fica pronta.</p>'; return; }
-  $("previa").innerHTML = bl.map((b) => {
+  $("previa").innerHTML = '<div class="folha leitura">' + bl.map((b) => {
     if (b.tipo === "tabela") {
       const linhas = (b.linhas || []).map((l) => `<tr>${(l.celulas || []).map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("");
       return `${b.titulo ? `<p class="tab-titulo">${esc(b.titulo)}</p>` : ""}<table>${linhas}</table>`;
@@ -381,8 +395,13 @@ function mostrarPrevia() {
       return `<p class="legenda">${b.figura ? "🖼 " : ""}${txt}</p>`;
     }
     return `<p class="${b.tipo}">${esc(b.texto)}</p>`;
-  }).join("");
+  }).join("") + "</div>";
 }
+
+$("btn-resetar").addEventListener("click", async () => {
+  if (!confirm("Descartar TODAS as edições deste capítulo e voltar para a tradução original?")) return;
+  await editor.resetar(blocosDoCapitulo());
+});
 
 // ---------- Word ----------
 async function recortarFiguras(blocos) {
@@ -419,9 +438,14 @@ async function recortarFiguras(blocos) {
 $("btn-word").addEventListener("click", async () => {
   const btn = $("btn-word"); btn.disabled = true;
   try {
-    const blocos = blocosDoCapitulo();
-    await abrirPdf();
-    const figuras = await recortarFiguras(blocos);
+    let blocos, figuras;
+    if (editor.aberto && editor.arquivo === estado.cap.arquivo) {
+      ({ blocos, figuras } = await editor.paraWord(LARG_FIGURA, status));
+    } else {
+      blocos = blocosDoCapitulo();
+      await abrirPdf();
+      figuras = await recortarFiguras(blocos);
+    }
     status("Montando o Word…");
     const blob = await gerarDocx(blocos, figuras);
     const a = document.createElement("a");
@@ -436,4 +460,5 @@ $("btn-word").addEventListener("click", async () => {
 });
 
 // ---------- arranque ----------
+editor = criarEditor({ raiz: $("previa"), obterPdf: abrirPdf, renderizar, aviso: log });
 if (senha()) iniciar(); else mostrarLogin();
