@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tradutor Green 8ª ed.</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232E74B5'/><text x='16' y='22' font-size='16' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'>PT</text></svg>">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header>
+  <div class="marca">
+    <span class="selo">PT</span>
+    <div>
+      <h1>Tradutor do Green</h1>
+      <p>Green's Operative Hand Surgery · 8ª edição → português</p>
+    </div>
+  </div>
+  <button id="sair" class="discreto" hidden>Sair</button>
+</header>
+
+<main>
+  <!-- Login -->
+  <section id="tela-login" class="cartao estreito" hidden>
+    <h2>Entrar</h2>
+    <form id="form-login">
+      <label for="senha">Senha</label>
+      <input id="senha" type="password" autocomplete="current-password" required>
+      <button type="submit" class="primario">Entrar</button>
+      <p id="erro-login" class="erro" hidden></p>
+    </form>
+  </section>
+
+  <!-- App -->
+  <section id="tela-app" hidden>
+    <div class="grade">
+      <div class="cartao">
+        <h2>1. Capítulo</h2>
+        <label for="capitulo">Escolha o capítulo</label>
+        <select id="capitulo"></select>
+        <p id="info-cap" class="dica"></p>
+
+        <details class="avancado">
+          <summary>Opções</summary>
+          <label for="modelo">Modelo do Gemini</label>
+          <select id="modelo"></select>
+          <label for="tam">Páginas por envio</label>
+          <select id="tam">
+            <option value="1">1 (mais lento, mais seguro)</option>
+            <option value="2" selected>2 (recomendado)</option>
+            <option value="3">3</option>
+            <option value="4">4 (mais rápido)</option>
+          </select>
+          <label for="pag-ini">Traduzir só um trecho (opcional)</label>
+          <div class="linha">
+            <input id="pag-ini" type="number" min="1" placeholder="da pág.">
+            <input id="pag-fim" type="number" min="1" placeholder="até pág.">
+          </div>
+        </details>
+
+        <div class="botoes">
+          <button id="btn-traduzir" class="primario">Traduzir</button>
+          <button id="btn-parar" hidden>Pausar</button>
+        </div>
+      </div>
+
+      <div class="cartao">
+        <h2>2. Progresso</h2>
+        <div class="barra"><div id="barra"></div></div>
+        <p id="status" class="status">Escolha um capítulo e clique em Traduzir.</p>
+        <ol id="log" class="log"></ol>
+        <div class="botoes">
+          <button id="btn-word" class="primario" disabled>Baixar Word (.docx)</button>
+          <button id="btn-limpar" class="discreto">Recomeçar capítulo</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="cartao">
+      <details id="det-glossario">
+        <summary><h2>Glossário</h2><span class="dica">termos que devem ser sempre traduzidos do mesmo jeito</span></summary>
+        <p class="dica">Um termo por linha, no formato <code>inglês = português</code>. Ex.: <code>avulsion = avulsão</code></p>
+        <textarea id="glossario" rows="8" spellcheck="false"></textarea>
+        <div class="botoes"><button id="btn-glossario">Salvar glossário</button><span id="ok-glossario" class="dica"></span></div>
+      </details>
+    </div>
+
+    <div class="cartao">
+      <h2>Prévia da tradução</h2>
+      <div id="previa" class="previa"><p class="dica">A tradução aparece aqui conforme fica pronta.</p></div>
+    </div>
+  </section>
+</main>
+
+<script src="vendor/docx.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
