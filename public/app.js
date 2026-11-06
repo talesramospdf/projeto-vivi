@@ -262,7 +262,7 @@ async function chamarGemini(paginas, anterior) {
       continue;
     }
     // "muita demanda" / sobrecarga do Google: espera cada vez mais e, depois de 2 seguidas, troca de modelo
-    const sobrecarga = d.status === 503 || d.status === 500 || /overload|high demand|unavailable|try again later/i.test(d.erro || "");
+    const sobrecarga = [500, 503, 504, 524].includes(d.status) || /overload|high demand|unavailable|try again later|Erro 52\d/i.test(d.erro || "");
     if (sobrecarga) {
       sobrecargas++;
       if (sobrecargas >= 2 && trocarModelo("está com muita demanda")) { continue; }
