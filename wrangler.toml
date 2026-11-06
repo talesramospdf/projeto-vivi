@@ -1,6 +1,11 @@
 name = "projeto-vivi"
-pages_build_output_dir = "public"
+main = "src/worker.js"
 compatibility_date = "2025-01-01"
+
+# Arquivos do site (HTML, JS, CSS)
+[assets]
+directory = "./public"
+binding = "ASSETS"
 
 # Bucket R2 com os PDFs dos capítulos e o capitulos.json
 [[r2_buckets]]

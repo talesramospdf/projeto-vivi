@@ -1,38 +1,17 @@
-import { SCHEMA, montarPrompt } from "../../lib/prompt.js";
-
 const API = "https://generativelanguage.googleapis.com/v1beta";
 
-// POST /api/traduzir
-// corpo: { modelo, imagens: [base64 jpeg], capitulo, numero, glossario, anterior }
-export async function onRequestPost({ env, request }) {
+// POST /api/traduzir?modelo=...
+// O corpo já vem pronto do navegador (prompt + imagens das páginas) e é repassado
+// direto ao Gemini, sem ser lido aqui: assim o Worker gasta quase nada de CPU.
+export async function traduzir(env, request, url) {
   if (!env.GEMINI_API_KEY) return Response.json({ erro: "Falta GEMINI_API_KEY nas variáveis do Cloudflare." }, { status: 500 });
-  const c = await request.json();
-  const modelo = (c.modelo || env.GEMINI_MODEL || "gemini-2.5-flash").replace(/^models\//, "");
-
-  const corpo = {
-    contents: [{
-      role: "user",
-      parts: [
-        { text: montarPrompt({ capitulo: c.capitulo, numero: c.numero, paginas: c.imagens.length, glossario: c.glossario, anterior: c.anterior }) },
-        ...c.imagens.map((data) => ({ inline_data: { mime_type: "image/jpeg", data } })),
-      ],
-    }],
-    generationConfig: {
-      temperature: 0.2,
-      maxOutputTokens: 60000,
-      responseMimeType: "application/json",
-      responseSchema: SCHEMA,
-    },
-    safetySettings: ["HARASSMENT", "HATE_SPEECH", "SEXUALLY_EXPLICIT", "DANGEROUS_CONTENT"].map((k) => ({
-      category: "HARM_CATEGORY_" + k, threshold: "BLOCK_NONE",
-    })),
-  };
-
+  const modelo = (url.searchParams.get("modelo") || env.GEMINI_MODEL || "gemini-2.5-flash").replace(/[^\w.\-]/g, "");
   const base = env.GEMINI_API_BASE || API; // GEMINI_API_BASE só é usado em testes locais
+
   const r = await fetch(`${base}/models/${modelo}:generateContent`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-    body: JSON.stringify(corpo),
+    body: request.body,
   });
   const dados = await r.json().catch(() => ({}));
 
@@ -46,10 +25,10 @@ export async function onRequestPost({ env, request }) {
   }
 
   const cand = dados.candidates?.[0];
-  const motivo = cand?.finishReason;
+  const motivo = cand?.finishReason || dados.promptFeedback?.blockReason;
   const texto = (cand?.content?.parts || []).filter((p) => !p.thought).map((p) => p.text || "").join("");
-  if (motivo && motivo !== "STOP") {
-    return Response.json({ erro: `O Gemini parou antes do fim (${motivo}).`, motivo }, { status: 502 });
+  if (!cand || (motivo && motivo !== "STOP")) {
+    return Response.json({ erro: `O Gemini parou antes do fim (${motivo || "sem resposta"}).`, motivo }, { status: 502 });
   }
   try {
     const json = JSON.parse(texto);

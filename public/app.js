@@ -1,5 +1,6 @@
 import * as pdfjs from "./vendor/pdf.min.js";
 import { gerarDocx } from "./word.js";
+import { SCHEMA, montarPrompt } from "./prompt.js";
 
 pdfjs.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.js";
 
@@ -205,15 +206,21 @@ async function chamarGemini(paginas, anterior) {
     const c = await renderizar(p, LARG_ENVIO);
     imagens.push(c.toDataURL("image/jpeg", 0.85).split(",")[1]);
   }
-  const corpo = {
-    modelo: $("modelo").value, imagens, anterior,
-    capitulo: estado.cap.titulo, numero: Number(estado.cap.id), glossario: $("glossario").value.trim(),
-  };
+  const prompt = montarPrompt({
+    capitulo: estado.cap.titulo, numero: Number(estado.cap.id), paginas: imagens.length,
+    glossario: $("glossario").value.trim(), anterior,
+  });
+  const corpo = JSON.stringify({
+    contents: [{ role: "user", parts: [{ text: prompt }, ...imagens.map((data) => ({ inline_data: { mime_type: "image/jpeg", data } }))] }],
+    generationConfig: { temperature: 0.2, maxOutputTokens: 60000, responseMimeType: "application/json", responseSchema: SCHEMA },
+    safetySettings: ["HARASSMENT", "HATE_SPEECH", "SEXUALLY_EXPLICIT", "DANGEROUS_CONTENT"].map((k) => ({ category: "HARM_CATEGORY_" + k, threshold: "BLOCK_NONE" })),
+  });
+  const rota = "/api/traduzir?modelo=" + encodeURIComponent($("modelo").value);
   for (let tent = 1; tent <= MAX_TENTATIVAS; tent++) {
     if (estado.parar) throw new Error("PAUSADO");
     let r, d;
     try {
-      r = await api("/api/traduzir", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corpo) });
+      r = await api(rota, { method: "POST", headers: { "content-type": "application/json" }, body: corpo });
       d = await r.json().catch(() => ({ erro: `Resposta inválida do servidor (${r.status}).` }));
     } catch (e) {
       if (e.message === "Senha incorreta.") throw e;

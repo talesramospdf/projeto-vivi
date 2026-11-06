@@ -5,7 +5,7 @@ Site que traduz os capítulos do *Green's Operative Hand Surgery* para o portugu
 ## Como funciona
 
 1. Os PDFs dos capítulos ficam no **Cloudflare R2** (bucket `livro-vivi`), gerados pelo `preparar_pdf.py`.
-2. O site (Cloudflare Pages) baixa o capítulo, transforma as páginas em imagens e envia de 2 em 2 ao Gemini.
+2. O site (Cloudflare Worker) baixa o capítulo, transforma as páginas em imagens e envia de 2 em 2 ao Gemini.
 3. O Gemini devolve o texto traduzido já estruturado (títulos, parágrafos, legendas com a posição das figuras, tabelas, quadros).
 4. O navegador recorta as figuras do PDF e monta o `.docx`.
 
@@ -15,14 +15,14 @@ O progresso fica salvo no navegador: dá para pausar, fechar e continuar depois.
 
 ```
 public/          site (index.html, app.js, word.js, estilo.css, vendor/)
-functions/api/   rotas do servidor (capitulos, pdf, traduzir, modelos, glossario)
-lib/             prompt do Gemini e acesso ao R2
-wrangler.toml    liga o bucket R2 "livro-vivi" ao site (binding LIVRO)
+public/prompt.js instruções enviadas ao Gemini
+src/             Worker: senha + rotas /api (capitulos, pdf, traduzir, modelos, glossario)
+wrangler.toml    Worker, arquivos do site e bucket R2 "livro-vivi" (binding LIVRO)
 ```
 
 ## Configuração no Cloudflare
 
-- **Pages → projeto conectado a este repositório**: framework "None", build command vazio, output directory `public`.
+- **Workers & Pages → Worker conectado a este repositório**: build command vazio, deploy command `npx wrangler deploy`.
 - **Settings → Variables and Secrets** (tipo *Secret*):
   - `GEMINI_API_KEY`: chave do Google AI Studio
   - `SENHA`: senha para entrar no site

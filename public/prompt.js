@@ -1,4 +1,4 @@
-// Instruções e formato de resposta enviados ao Gemini.
+// Instruções e formato de resposta enviados ao Gemini (montados no navegador).
 
 export const TIPOS = [
   "titulo_capitulo", // título do capítulo (sem o número)
