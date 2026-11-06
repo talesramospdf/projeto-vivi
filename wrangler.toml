@@ -15,3 +15,7 @@ binding = "LIVRO"
 bucket_name = "livro-vivi"
 
 # GEMINI_API_KEY e SENHA são "Secrets" configurados no painel do Cloudflare.
+
+# Tradução em segundo plano: processa a fila a cada minuto (grátis)
+[triggers]
+crons = ["* * * * *"]

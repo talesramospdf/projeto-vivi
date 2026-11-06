@@ -8,6 +8,7 @@
 export const TIPOS = {
   titulo_capitulo: "Título do capítulo",
   autores: "Autores",
+  agradecimentos: "Agradecimentos (itálico)",
   secao: "Seção (azul, MAIÚSCULAS)",
   subsecao: "Subseção (verde)",
   subsubsecao: "Sub-subseção (roxo)",
@@ -15,13 +16,17 @@ export const TIPOS = {
   item_lista: "Item de lista",
   legenda: "Imagem + legenda",
   tabela: "Tabela",
+  metodo_preferido: "Faixa laranja (Método preferido)",
+  caixa_titulo: "Box cinza: título",
+  caixa_item: "Box cinza: linha",
   quadro_titulo: "Quadro: PONTOS CRÍTICOS",
   quadro_subtitulo: "Quadro: procedimento",
   quadro_secao: "Quadro: seção (Indicações...)",
   quadro_item: "Quadro: item (•)",
 };
-const TEXTO_CORRIDO = ["paragrafo", "item_lista", "quadro_item"];
+const TEXTO_CORRIDO = ["paragrafo", "item_lista", "quadro_item", "caixa_item"];
 const ESCALAS = { P: 0.5, M: 0.75, G: 1 };
+const VERSAO_DOC = 2; // aumentar quando a montagem do capítulo mudar
 
 // ---------- IndexedDB ----------
 let _db;
@@ -105,7 +110,7 @@ export function criarEditor({ raiz, obterPdf, renderizar, aviso }) {
     let blob;
     if (b.imagemId) blob = await dbLer("imagens", b.imagemId);
     else {
-      const c = cortar(await paginaRenderizada(b.figura.pagina), comFolga(b.figura.caixa));
+      const c = cortar(await paginaRenderizada(b.figura.pagina), b.figura.exata ? b.figura.caixa : comFolga(b.figura.caixa));
       if (c) blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.85));
     }
     if (!blob) return null;
@@ -307,7 +312,10 @@ export function criarEditor({ raiz, obterPdf, renderizar, aviso }) {
       ? [figuraUI(b), editavel(b, "texto", "legenda", "Legenda (opcional) — ex.: Fig. 34.1 ...")]
       : b.tipo === "tabela"
         ? [tabelaUI(b)]
-        : [editavel(b, "texto", b.tipo, "Digite aqui…", dividir(b))];
+        : [
+          b.destaque != null ? editavel(b, "destaque", "destaque", "Título embutido (laranja)") : null,
+          editavel(b, "texto", b.tipo + (b.marcador ? " marcador" : ""), "Digite aqui…", dividir(b)),
+        ].filter(Boolean);
     return el("div", { class: "bloco", "data-id": b.id, "data-tipo": b.tipo }, ferramentas(b), ...corpo);
   }
 
@@ -368,7 +376,7 @@ export function criarEditor({ raiz, obterPdf, renderizar, aviso }) {
       if (a === "cancelar") modal.close();
       if (a === "ok") {
         if (!caixa || caixa[2] - caixa[0] < 10 || caixa[3] - caixa[1] < 10) { alert("Arraste sobre a página para marcar a figura."); return; }
-        b.figura = { pagina: pag, caixa: caixa.map(Math.round) }; delete b.imagemId;
+        b.figura = { pagina: pag, caixa: caixa.map(Math.round), exata: true }; delete b.imagemId;
         if (!b.tamanho) b.tamanho = "G";
         salvar(); modal.close(); redesenhar(b);
       }
@@ -448,8 +456,9 @@ export function criarEditor({ raiz, obterPdf, renderizar, aviso }) {
       limparCache();
       arquivo = arq;
       doc = await dbLer("docs", arq).catch(() => null);
+      if (doc && (doc.versao || 1) < VERSAO_DOC) doc = null; // documento de uma versão antiga do site: refaz com as melhorias
       if (!doc) {
-        doc = { blocos: blocosTraduzidos.map((b) => ({ ...b, id: novoId(), tamanho: "G" })) };
+        doc = { versao: VERSAO_DOC, blocos: blocosTraduzidos.map((b) => ({ ...b, id: novoId(), tamanho: "G" })) };
         await dbGravar("docs", arq, doc);
       }
       if (arquivo !== arq) return; // trocou de capítulo enquanto carregava
@@ -489,7 +498,7 @@ export function criarEditor({ raiz, obterPdf, renderizar, aviso }) {
           tipo = blob.type === "image/png" ? "png" : "jpg";
         } else {
           if (!cachePag.has(b.figura.pagina)) { cachePag.clear(); await obterPdf(); cachePag.set(b.figura.pagina, await renderizar(b.figura.pagina, largura)); }
-          const c = cortar(cachePag.get(b.figura.pagina), comFolga(b.figura.caixa));
+          const c = cortar(cachePag.get(b.figura.pagina), b.figura.exata ? b.figura.caixa : comFolga(b.figura.caixa));
           if (!c) continue;
           blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.9));
         }

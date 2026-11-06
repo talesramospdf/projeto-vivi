@@ -43,63 +43,72 @@
 
   <!-- App -->
   <section id="tela-app" hidden>
+    <!-- faixa de status do tradutor em segundo plano -->
+    <div id="faixa" class="faixa">
+      <span id="faixa-icone" class="faixa-icone">♡</span>
+      <div class="faixa-texto"><strong id="faixa-titulo">Carregando…</strong><span id="faixa-sub"></span></div>
+      <button id="btn-acordar" class="discreto" hidden>Tentar agora</button>
+    </div>
+
     <div class="grade">
+      <!-- capítulos -->
       <div class="cartao">
-        <h2><span class="num">1</span> Capítulo</h2>
-        <label for="capitulo">Escolha o capítulo</label>
-        <select id="capitulo"></select>
-        <p id="info-cap" class="dica"></p>
+        <div class="cab"><h2><span class="num">1</span> Capítulos</h2><span id="contagem" class="dica"></span></div>
+        <div class="filtros" role="tablist">
+          <button class="filtro ativo" data-f="todos">Todos</button>
+          <button class="filtro" data-f="pendentes">A fazer</button>
+          <button class="filtro" data-f="fila">Na fila</button>
+          <button class="filtro" data-f="prontos">Prontos</button>
+        </div>
+        <ul id="lista-caps" class="lista-caps"></ul>
+        <div id="acoes-sel" class="acoes-sel" hidden>
+          <span id="qtd-sel"></span>
+          <button id="btn-enfileirar" class="primario">Colocar na fila</button>
+          <button id="btn-marcar">Marcar como já feito</button>
+          <button id="btn-desmarcar" class="discreto">Desmarcar</button>
+        </div>
+        <p class="dica">Marque os capítulos e clique em <b>Colocar na fila</b>. Clique no nome de um capítulo para abrir, revisar e baixar o Word.</p>
+      </div>
 
-        <details class="avancado">
-          <summary>Opções</summary>
-          <label for="modelo">Modelo do Gemini</label>
-          <select id="modelo"></select>
-          <label for="tam">Páginas por envio</label>
-          <select id="tam">
-            <option value="1">1 (mais lento, mais seguro)</option>
-            <option value="2" selected>2 (recomendado)</option>
-            <option value="3">3</option>
-            <option value="4">4 (mais rápido)</option>
-          </select>
-          <label for="pag-ini">Traduzir só um trecho (opcional)</label>
-          <div class="linha">
-            <input id="pag-ini" type="number" min="1" placeholder="da pág.">
-            <input id="pag-fim" type="number" min="1" placeholder="até pág.">
+      <!-- fila -->
+      <div class="cartao">
+        <div class="cab"><h2><span class="num">2</span> Fila de tradução</h2></div>
+        <div id="envio" class="envio" hidden>
+          <div class="mini"><img id="miniatura" alt="Página sendo preparada"><span id="mini-pag"></span></div>
+          <div class="ativ-texto">
+            <p id="envio-titulo" class="etapa">Preparando…</p>
+            <div class="barra"><div id="envio-barra"></div></div>
+            <p class="aviso-envio">⚠ Mantenha o site aberto só até terminar este envio. Depois pode fechar.</p>
           </div>
+        </div>
+        <ol id="lista-fila" class="lista-fila"></ol>
+        <p id="fila-vazia" class="dica">A fila está vazia. Marque capítulos ao lado e clique em <b>Colocar na fila</b>.</p>
+        <details class="avancado">
+          <summary>⚙ Ajustes</summary>
+          <label for="modelo">Modelo preferido do Gemini</label>
+          <select id="modelo"></select>
+          <p class="dica">Se ele estiver lotado ou sem limite, o tradutor troca sozinho para outro.</p>
+          <label for="glossario">Glossário (um termo por linha: <code>inglês = português</code>)</label>
+          <textarea id="glossario" rows="6" spellcheck="false" placeholder="avulsion = avulsão"></textarea>
+          <div class="botoes"><button id="btn-glossario">Salvar glossário</button><span id="ok-glossario" class="dica"></span></div>
         </details>
-
-        <div class="botoes">
-          <button id="btn-traduzir" class="primario">Traduzir</button>
-          <button id="btn-parar" hidden>Pausar</button>
-        </div>
-      </div>
-
-      <div class="cartao">
-        <h2><span class="num">2</span> Progresso</h2>
-        <div class="barra"><div id="barra"></div></div>
-        <p id="status" class="status">Escolha um capítulo e clique em Traduzir.</p>
-        <ol id="log" class="log"></ol>
-        <div class="botoes">
-          <button id="btn-word" class="primario" disabled>Baixar Word (.docx)</button>
-          <button id="btn-limpar" class="discreto">Recomeçar capítulo</button>
-        </div>
       </div>
     </div>
 
-    <div class="cartao">
-      <details id="det-glossario">
-        <summary><h2>Glossário</h2><span class="dica">termos que devem ser sempre traduzidos do mesmo jeito</span></summary>
-        <p class="dica">Um termo por linha, no formato <code>inglês = português</code>. Ex.: <code>avulsion = avulsão</code></p>
-        <textarea id="glossario" rows="8" spellcheck="false"></textarea>
-        <div class="botoes"><button id="btn-glossario">Salvar glossário</button><span id="ok-glossario" class="dica"></span></div>
-      </details>
-    </div>
-
-    <div class="cartao">
+    <!-- capítulo aberto -->
+    <div id="cartao-cap" class="cartao" hidden>
       <div class="cab-previa">
-        <h2 id="titulo-previa">✿ Prévia da tradução</h2>
-        <button id="btn-resetar" class="discreto" hidden>Desfazer todas as edições</button>
+        <h2 id="titulo-previa">✿ Capítulo</h2>
+        <div class="botoes topo">
+          <button id="btn-word" class="primario" disabled>Baixar Word (.docx)</button>
+          <button id="btn-resetar" class="discreto" hidden>Desfazer todas as edições</button>
+          <button id="btn-limpar" class="discreto">Traduzir de novo</button>
+        </div>
       </div>
+      <p id="status" class="status"></p>
+      <div class="barra"><div id="barra"></div></div>
+      <ul id="erros-cap" class="erros-cap" hidden></ul>
+      <ol id="log" class="log"></ol>
       <p id="dica-editor" class="dica" hidden>Clique em qualquer texto para corrigir. <b>Enter</b> cria um parágrafo novo. Para imagens: <b>cole com Ctrl+V</b>, <b>arraste um arquivo</b> para cá ou use os botões de cada bloco. Tudo fica salvo sozinho, e o <b>Baixar Word</b> já sai com as suas mudanças.</p>
       <div id="previa" class="previa"><p class="dica">A tradução aparece aqui conforme fica pronta.</p></div>
     </div>
